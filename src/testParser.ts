@@ -127,19 +127,22 @@ export async function resolvePath(fileName: string, excludeSources: string[], fo
 
   core.debug(`Resolving path for ${fileName}`)
   const normalizedFilename = fileName.replace(/^\.\//, '') // strip relative prefix (./)
-  const globber = await glob.create(`**/${normalizedFilename}.*`, {
-    followSymbolicLinks: followSymlink
-  })
-  const searchPath = globber.getSearchPaths() ? globber.getSearchPaths()[0] : ''
-  for await (const result of globber.globGenerator()) {
-    core.debug(`Matched file: ${result}`)
 
-    const found = excludeSources.find(v => result.includes(v))
-    if (!found) {
-      const path = result.slice(searchPath.length + 1)
-      core.debug(`Resolved path: ${path}`)
-      resolvePathCache[fileName] = path
-      return path
+  if (!fs.existsSync(normalizedFilename)) {
+    const globber = await glob.create(`**/${normalizedFilename}.*`, {
+      followSymbolicLinks: followSymlink
+    })
+    const searchPath = globber.getSearchPaths() ? globber.getSearchPaths()[0] : ''
+    for await (const result of globber.globGenerator()) {
+      core.debug(`Matched file: ${result}`)
+
+      const found = excludeSources.find(v => result.includes(v))
+      if (!found) {
+        const path = result.slice(searchPath.length + 1)
+        core.debug(`Resolved path: ${path}`)
+        resolvePathCache[fileName] = path
+        return path
+      }
     }
   }
   resolvePathCache[fileName] = normalizedFilename
