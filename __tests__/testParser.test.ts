@@ -969,8 +969,7 @@ action.surefire.report.email.InvalidEmailAddressException: Invalid email address
         retries: 0,
         annotation_level: 'failure',
         status: 'failure',
-        title:
-          'packages/test-runner-junit-reporter/test/fixtures/multiple/simple-test.js:asserts error',
+        title: 'packages/test-runner-junit-reporter/test/fixtures/multiple/simple-test.js:asserts error',
         message: 'expected false to be true',
         raw_details:
           'AssertionError: expected false to be true\n  at o.<anonymous> (packages/test-runner-junit-reporter/test/fixtures/multiple/simple-test.js:15:29)'

@@ -747,6 +747,7 @@ async function parseTestCases(suiteName, suiteFile, suiteLine, breadCrumb, testc
             const className = baseClassName.split('.').slice(-1)[0];
             title = checkTitleTemplate
                 .replace(templateVar('FILE_NAME'), fileName)
+                .replace(templateVar('RESOLVED_PATH'), resolvedPath)
                 .replace(templateVar('BREAD_CRUMB'), breadCrumb !== null && breadCrumb !== void 0 ? breadCrumb : '')
                 .replace(templateVar('SUITE_NAME'), suiteName !== null && suiteName !== void 0 ? suiteName : '')
                 .replace(templateVar('TEST_NAME'), testcase._attributes.name)
