@@ -127,26 +127,26 @@ export async function resolvePath(fileName: string, excludeSources: string[], fo
 
   let normalizedFilename = fileName
 
-  // if (!fs.existsSync(fileName)) {
-  core.debug(`Resolving path for ${fileName}`)
+  if (!fs.existsSync(fileName)) {
+    core.debug(`Resolving path for ${fileName}`)
 
-  normalizedFilename = fileName.replace(/^\.\//, '') // strip relative prefix (./)
-  const globber = await glob.create(`**/${normalizedFilename}.*`, {
-    followSymbolicLinks: followSymlink
-  })
-  const searchPath = globber.getSearchPaths() ? globber.getSearchPaths()[0] : ''
-  for await (const result of globber.globGenerator()) {
-    core.debug(`Matched file: ${result}`)
+    normalizedFilename = fileName.replace(/^\.\//, '') // strip relative prefix (./)
+    const globber = await glob.create(`**/${normalizedFilename}.*`, {
+      followSymbolicLinks: followSymlink
+    })
+    const searchPath = globber.getSearchPaths() ? globber.getSearchPaths()[0] : ''
+    for await (const result of globber.globGenerator()) {
+      core.debug(`Matched file: ${result}`)
 
-    const found = excludeSources.find(v => result.includes(v))
-    if (!found) {
-      const path = result.slice(searchPath.length + 1)
-      core.debug(`Resolved path: ${path}`)
-      resolvePathCache[fileName] = path
-      return path
+      const found = excludeSources.find(v => result.includes(v))
+      if (!found) {
+        const path = result.slice(searchPath.length + 1)
+        core.debug(`Resolved path: ${path}`)
+        resolvePathCache[fileName] = path
+        return path
+      }
     }
   }
-  // }
 
   resolvePathCache[fileName] = normalizedFilename
   return normalizedFilename
