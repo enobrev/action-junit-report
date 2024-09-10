@@ -31,6 +31,7 @@ export async function run(): Promise<void> {
     const comment = core.getInput('comment') === 'true'
     const updateComment = core.getInput('updateComment') === 'true'
     const jobName = core.getInput('job_name')
+    const stripFilePrefix = core.getInput('strip_file_prefix')
 
     const reportPaths = core.getMultilineInput('report_paths')
     const summary = core.getMultilineInput('summary')
@@ -79,6 +80,7 @@ export async function run(): Promise<void> {
         excludeSources,
         retrieve('checkTitleTemplate', checkTitleTemplate, i, reportsCount),
         breadCrumbDelimiter,
+        stripFilePrefix,
         retrieve('testFilesPrefix', testFilesPrefix, i, reportsCount),
         transformers,
         followSymlink,

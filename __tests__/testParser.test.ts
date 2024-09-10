@@ -190,6 +190,7 @@ describe('parseFile', () => {
       undefined,
       undefined,
       '/',
+      '',
       undefined,
       undefined,
       undefined,
@@ -264,6 +265,7 @@ describe('parseFile', () => {
       ['/build/', '/__pycache__/'],
       '{{BREAD_CRUMB}}{{SUITE_NAME}}/{{TEST_NAME}}',
       '/',
+      '',
       'subproject/'
     )
     const filtered = annotations.filter(annotation => annotation.annotation_level !== 'notice')
@@ -851,6 +853,7 @@ action.surefire.report.email.InvalidEmailAddressException: Invalid email address
       ['/build/', '/__pycache__/'],
       '{{TEST_NAME}}',
       '',
+      '',
       'subproject'
     )
 
@@ -936,6 +939,38 @@ action.surefire.report.email.InvalidEmailAddressException: Invalid email address
         annotation_level: 'failure',
         status: 'failure',
         title: 'packages/test-runner-junit-reporter/test/fixtures/multiple/simple-test.js.asserts error',
+        message: 'expected false to be true',
+        raw_details:
+          'AssertionError: expected false to be true\n  at o.<anonymous> (packages/test-runner-junit-reporter/test/fixtures/multiple/simple-test.js:15:29)'
+      }
+    ])
+  })
+
+  it('should replace designated file paths', async () => {
+    const {annotations} = await parseFile(
+      'test_results/junit-web-test/expectedFullPath.xml',
+      '',
+      true,
+      undefined,
+      undefined,
+      '{{RESOLVED_PATH}}:{{TEST_NAME}}',
+      '/',
+      '/home/runner/work/testing/testing/'
+    )
+
+    const filtered = annotations.filter(annotation => annotation.annotation_level !== 'notice')
+    expect(filtered).toStrictEqual([
+      {
+        path: 'packages/test-runner-junit-reporter/test/fixtures/multiple/simple-test.js',
+        start_line: 15,
+        end_line: 15,
+        start_column: 0,
+        end_column: 0,
+        retries: 0,
+        annotation_level: 'failure',
+        status: 'failure',
+        title:
+          'packages/test-runner-junit-reporter/test/fixtures/multiple/simple-test.js:asserts error',
         message: 'expected false to be true',
         raw_details:
           'AssertionError: expected false to be true\n  at o.<anonymous> (packages/test-runner-junit-reporter/test/fixtures/multiple/simple-test.js:15:29)'
@@ -1090,6 +1125,7 @@ action.surefire.report.email.InvalidEmailAddressException: Invalid email address
       undefined,
       undefined,
       '/',
+      '',
       undefined,
       transformer
     )
@@ -1206,7 +1242,8 @@ describe('parseTestReports', () => {
       true,
       [],
       '{{SUITE_NAME}}/{{TEST_NAME}}',
-      '/'
+      '/',
+      ''
     )
 
     expect(checkName).toBe('checkName')
@@ -1243,6 +1280,7 @@ describe('parseTestReports', () => {
       [],
       '',
       '/',
+      '',
       '',
       undefined,
       false,

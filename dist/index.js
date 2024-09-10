@@ -311,6 +311,7 @@ async function run() {
         const comment = core.getInput('comment') === 'true';
         const updateComment = core.getInput('updateComment') === 'true';
         const jobName = core.getInput('job_name');
+        const stripFilePrefix = core.getInput('strip_file_prefix');
         const reportPaths = core.getMultilineInput('report_paths');
         const summary = core.getMultilineInput('summary');
         const checkName = core.getMultilineInput('check_name');
@@ -342,7 +343,7 @@ async function run() {
         };
         core.info(`Preparing ${reportsCount} report as configured.`);
         for (let i = 0; i < reportsCount; i++) {
-            const testResult = await (0, testParser_1.parseTestReports)((0, utils_1.retrieve)('checkName', checkName, i, reportsCount), (0, utils_1.retrieve)('summary', summary, i, reportsCount), (0, utils_1.retrieve)('reportPaths', reportPaths, i, reportsCount), (0, utils_1.retrieve)('suiteRegex', suiteRegex, i, reportsCount), includePassed, checkRetries, excludeSources, (0, utils_1.retrieve)('checkTitleTemplate', checkTitleTemplate, i, reportsCount), breadCrumbDelimiter, (0, utils_1.retrieve)('testFilesPrefix', testFilesPrefix, i, reportsCount), transformers, followSymlink, annotationsLimit, truncateStackTraces);
+            const testResult = await (0, testParser_1.parseTestReports)((0, utils_1.retrieve)('checkName', checkName, i, reportsCount), (0, utils_1.retrieve)('summary', summary, i, reportsCount), (0, utils_1.retrieve)('reportPaths', reportPaths, i, reportsCount), (0, utils_1.retrieve)('suiteRegex', suiteRegex, i, reportsCount), includePassed, checkRetries, excludeSources, (0, utils_1.retrieve)('checkTitleTemplate', checkTitleTemplate, i, reportsCount), breadCrumbDelimiter, stripFilePrefix, (0, utils_1.retrieve)('testFilesPrefix', testFilesPrefix, i, reportsCount), transformers, followSymlink, annotationsLimit, truncateStackTraces);
             mergedResult.totalCount += testResult.totalCount;
             mergedResult.skipped += testResult.skipped;
             mergedResult.failed += testResult.failed;
@@ -515,24 +516,25 @@ async function resolvePath(fileName, excludeSources, followSymlink = false) {
     if (resolvePathCache[fileName]) {
         return resolvePathCache[fileName];
     }
+    let normalizedFilename = fileName;
+    // if (!fs.existsSync(fileName)) {
     core.debug(`Resolving path for ${fileName}`);
-    const normalizedFilename = fileName.replace(/^\.\//, ''); // strip relative prefix (./)
-    if (!fs.existsSync(normalizedFilename)) {
-        const globber = await glob.create(`**/${normalizedFilename}.*`, {
-            followSymbolicLinks: followSymlink
-        });
-        const searchPath = globber.getSearchPaths() ? globber.getSearchPaths()[0] : '';
-        for await (const result of globber.globGenerator()) {
-            core.debug(`Matched file: ${result}`);
-            const found = excludeSources.find(v => result.includes(v));
-            if (!found) {
-                const path = result.slice(searchPath.length + 1);
-                core.debug(`Resolved path: ${path}`);
-                resolvePathCache[fileName] = path;
-                return path;
-            }
+    normalizedFilename = fileName.replace(/^\.\//, ''); // strip relative prefix (./)
+    const globber = await glob.create(`**/${normalizedFilename}.*`, {
+        followSymbolicLinks: followSymlink
+    });
+    const searchPath = globber.getSearchPaths() ? globber.getSearchPaths()[0] : '';
+    for await (const result of globber.globGenerator()) {
+        core.debug(`Matched file: ${result}`);
+        const found = excludeSources.find(v => result.includes(v));
+        if (!found) {
+            const path = result.slice(searchPath.length + 1);
+            core.debug(`Resolved path: ${path}`);
+            resolvePathCache[fileName] = path;
+            return path;
         }
     }
+    // }
     resolvePathCache[fileName] = normalizedFilename;
     return normalizedFilename;
 }
@@ -544,7 +546,7 @@ async function resolvePath(fileName, excludeSources, followSymlink = false) {
  * https://github.com/mikepenz/action-junit-report/
  */
 async function parseFile(file, suiteRegex = '', // no-op
-annotatePassed = false, checkRetries = false, excludeSources = ['/build/', '/__pycache__/'], checkTitleTemplate = undefined, breadCrumbDelimiter = '/', testFilesPrefix = '', transformer = [], followSymlink = false, annotationsLimit = -1, truncateStackTraces = true) {
+annotatePassed = false, checkRetries = false, excludeSources = ['/build/', '/__pycache__/'], checkTitleTemplate = undefined, breadCrumbDelimiter = '/', stripFilePrefix = '', testFilesPrefix = '', transformer = [], followSymlink = false, annotationsLimit = -1, truncateStackTraces = true) {
     core.debug(`Parsing file ${file}`);
     const data = fs.readFileSync(file, 'utf8');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -575,7 +577,7 @@ annotatePassed = false, checkRetries = false, excludeSources = ['/build/', '/__p
         };
     }
     return parseSuite(testsuite, suiteRegex, // no-op
-    '', breadCrumbDelimiter, annotatePassed, checkRetries, excludeSources, checkTitleTemplate, testFilesPrefix, transformer, followSymlink, annotationsLimit, truncateStackTraces, []);
+    '', breadCrumbDelimiter, stripFilePrefix, annotatePassed, checkRetries, excludeSources, checkTitleTemplate, testFilesPrefix, transformer, followSymlink, annotationsLimit, truncateStackTraces, []);
 }
 function templateVar(varName) {
     return `{{${varName}}}`;
@@ -583,7 +585,7 @@ function templateVar(varName) {
 async function parseSuite(
 /* eslint-disable  @typescript-eslint/no-explicit-any */
 suite, suiteRegex, // no-op
-breadCrumb, breadCrumbDelimiter = '/', annotatePassed = false, checkRetries = false, excludeSources, checkTitleTemplate = undefined, testFilesPrefix = '', transformer, followSymlink, annotationsLimit, truncateStackTraces, globalAnnotations) {
+breadCrumb, breadCrumbDelimiter = '/', stripFilePrefix, annotatePassed = false, checkRetries = false, excludeSources, checkTitleTemplate = undefined, testFilesPrefix = '', transformer, followSymlink, annotationsLimit, truncateStackTraces, globalAnnotations) {
     if (!suite) {
         // not a valid suite, return fast
         return { name: '', totalCount: 0, skippedCount: 0, annotations: [], testResults: [] };
@@ -601,7 +603,7 @@ breadCrumb, breadCrumbDelimiter = '/', annotatePassed = false, checkRetries = fa
         const suiteFile = suite._attributes !== undefined ? suite._attributes.file : null;
         const suiteLine = suite._attributes !== undefined ? suite._attributes.line : null;
         const limit = annotationsLimit >= 0 ? annotationsLimit - globalAnnotations.length : annotationsLimit;
-        const parsedTestCases = await parseTestCases(suiteName, suiteFile, suiteLine, breadCrumb, testcases, annotatePassed, checkRetries, excludeSources, checkTitleTemplate, testFilesPrefix, transformer, followSymlink, truncateStackTraces, limit);
+        const parsedTestCases = await parseTestCases(suiteName, suiteFile, suiteLine, breadCrumb, testcases, annotatePassed, checkRetries, excludeSources, checkTitleTemplate, testFilesPrefix, transformer, followSymlink, stripFilePrefix, truncateStackTraces, limit);
         // expand global annotations array
         totalCount += parsedTestCases.totalCount;
         skippedCount += parsedTestCases.skippedCount;
@@ -629,7 +631,7 @@ breadCrumb, breadCrumbDelimiter = '/', annotatePassed = false, checkRetries = fa
     const childSuiteResults = [];
     const childBreadCrumb = suiteName ? `${breadCrumb}${suiteName}${breadCrumbDelimiter}` : breadCrumb;
     for (const childSuite of childTestSuites) {
-        const childSuiteResult = await parseSuite(childSuite, suiteRegex, childBreadCrumb, breadCrumbDelimiter, annotatePassed, checkRetries, excludeSources, checkTitleTemplate, testFilesPrefix, transformer, followSymlink, annotationsLimit, truncateStackTraces, globalAnnotations);
+        const childSuiteResult = await parseSuite(childSuite, suiteRegex, childBreadCrumb, breadCrumbDelimiter, stripFilePrefix, annotatePassed, checkRetries, excludeSources, checkTitleTemplate, testFilesPrefix, transformer, followSymlink, annotationsLimit, truncateStackTraces, globalAnnotations);
         childSuiteResults.push(childSuiteResult);
         totalCount += childSuiteResult.totalCount;
         skippedCount += childSuiteResult.skippedCount;
@@ -652,7 +654,7 @@ breadCrumb, breadCrumbDelimiter = '/', annotatePassed = false, checkRetries = fa
         testResults: childSuiteResults
     };
 }
-async function parseTestCases(suiteName, suiteFile, suiteLine, breadCrumb, testcases, annotatePassed = false, checkRetries = false, excludeSources, checkTitleTemplate = undefined, testFilesPrefix = '', transformer, followSymlink, truncateStackTraces, limit = -1) {
+async function parseTestCases(suiteName, suiteFile, suiteLine, breadCrumb, testcases, annotatePassed = false, checkRetries = false, excludeSources, checkTitleTemplate = undefined, testFilesPrefix = '', transformer, followSymlink, stripFilePrefix, truncateStackTraces, limit = -1) {
     var _a, _b;
     const annotations = [];
     let totalCount = 0;
@@ -735,10 +737,8 @@ async function parseTestCases(suiteName, suiteFile, suiteLine, breadCrumb, testc
             ? await resolvePath(transformedFileName, excludeSources, followSymlink)
             : transformedFileName;
         core.debug(`Path prior to stripping: ${resolvedPath}`);
-        const githubWorkspacePath = process.env['GITHUB_WORKSPACE'];
-        if (githubWorkspacePath) {
-            resolvedPath = resolvedPath.replace(`${githubWorkspacePath}/`, ''); // strip workspace prefix, make the path relative
-        }
+        const prefix = stripFilePrefix.length > 0 ? stripFilePrefix : `${process.env['GITHUB_WORKSPACE']}/`;
+        resolvedPath = resolvedPath.replace(prefix, ''); // strip prefix, make the path relative
         let title = '';
         if (checkTitleTemplate) {
             // ensure to not duplicate the test_name if file_name is equal
@@ -793,7 +793,7 @@ async function parseTestCases(suiteName, suiteFile, suiteLine, breadCrumb, testc
  * https://github.com/mikepenz/action-junit-report/
  */
 async function parseTestReports(checkName, summary, reportPaths, suiteRegex, // no-op
-annotatePassed = false, checkRetries = false, excludeSources, checkTitleTemplate = undefined, breadCrumbDelimiter, testFilesPrefix = '', transformer = [], followSymlink = false, annotationsLimit = -1, truncateStackTraces = true) {
+annotatePassed = false, checkRetries = false, excludeSources, checkTitleTemplate = undefined, breadCrumbDelimiter, stripFilePrefix, testFilesPrefix = '', transformer = [], followSymlink = false, annotationsLimit = -1, truncateStackTraces = true) {
     core.debug(`Process test report for: ${reportPaths} (${checkName})`);
     const globber = await glob.create(reportPaths, { followSymbolicLinks: followSymlink });
     let annotations = [];
@@ -803,7 +803,7 @@ annotatePassed = false, checkRetries = false, excludeSources, checkTitleTemplate
     for await (const file of globber.globGenerator()) {
         foundFiles++;
         core.debug(`Parsing report file: ${file}`);
-        const { totalCount: c, skippedCount: s, annotations: a } = await parseFile(file, suiteRegex, annotatePassed, checkRetries, excludeSources, checkTitleTemplate, breadCrumbDelimiter, testFilesPrefix, transformer, followSymlink, annotationsLimit, truncateStackTraces);
+        const { totalCount: c, skippedCount: s, annotations: a } = await parseFile(file, suiteRegex, annotatePassed, checkRetries, excludeSources, checkTitleTemplate, breadCrumbDelimiter, stripFilePrefix, testFilesPrefix, transformer, followSymlink, annotationsLimit, truncateStackTraces);
         if (c === 0)
             continue;
         totalCount += c;

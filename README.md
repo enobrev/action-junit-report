@@ -86,7 +86,7 @@ jobs:
 | `require_passed_tests`  | Optional. Fail if no passed test are found. (This is stricter than `require_tests`, which accepts skipped tests).                                                                                   |
 | `include_passed`        | Optional. By default the action will skip passed items for the annotations. Enable this flag to include them.                                                                                       |
 | `check_retries`         | Optional. If a testcase is retried, ignore the original failure.                                                                                                                                    |
-| `check_title_template`  | Optional. Template to configure the title format. Placeholders: {{FILE_NAME}}, {{SUITE_NAME}}, {{TEST_NAME}}, {{CLASS_NAME}}, {{BREAD_CRUMB}}.                                                      |
+| `check_title_template`  | Optional. Template to configure the title format. Placeholders: {{FILE_NAME}}, {{RESOLVED_PATH}}, {{SUITE_NAME}}, {{TEST_NAME}}, {{CLASS_NAME}}, {{BREAD_CRUMB}}.                                   |
 | `bread_crumb_delimiter` | Optional. Defines the delimiter characters between the breadcrumb elements. Defaults to: `/`.                                                                                                       |
 | `summary`               | Optional. Additional text to summary output                                                                                                                                                         |
 | `check_annotations`     | Optional. Defines if the checks will include annotations. If disabled skips all annotations for the check. (This does not affect `annotate_only`, which uses no checks).                            |
@@ -102,6 +102,7 @@ jobs:
 | `follow_symlink`        | Optional. Enables to follow symlinks when searching test files via the globber. Defaults to `false`.                                                                                                |
 | `job_name`              | Optional. Specify the name of a check to update                                                                                                                                                     |
 | `annotations_limit`     | Optional. Specify the limit for annotations. This will also interrupt parsing all test-suites if the limit is reached. Defaults to: `No Limit`.                                                     |
+| `strip_file_prefix`     | Optional. Specify the file prefix to strip for the report.  Defaults to: `${{ env.GITHUB_WORKSPACE }}`.                                                                                             |
 
 ### Common Configurations
 

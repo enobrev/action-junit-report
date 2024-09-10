@@ -125,26 +125,29 @@ export async function resolvePath(fileName: string, excludeSources: string[], fo
     return resolvePathCache[fileName]
   }
 
+  let normalizedFilename = fileName
+
+  // if (!fs.existsSync(fileName)) {
   core.debug(`Resolving path for ${fileName}`)
-  const normalizedFilename = fileName.replace(/^\.\//, '') // strip relative prefix (./)
 
-  if (!fs.existsSync(normalizedFilename)) {
-    const globber = await glob.create(`**/${normalizedFilename}.*`, {
-      followSymbolicLinks: followSymlink
-    })
-    const searchPath = globber.getSearchPaths() ? globber.getSearchPaths()[0] : ''
-    for await (const result of globber.globGenerator()) {
-      core.debug(`Matched file: ${result}`)
+  normalizedFilename = fileName.replace(/^\.\//, '') // strip relative prefix (./)
+  const globber = await glob.create(`**/${normalizedFilename}.*`, {
+    followSymbolicLinks: followSymlink
+  })
+  const searchPath = globber.getSearchPaths() ? globber.getSearchPaths()[0] : ''
+  for await (const result of globber.globGenerator()) {
+    core.debug(`Matched file: ${result}`)
 
-      const found = excludeSources.find(v => result.includes(v))
-      if (!found) {
-        const path = result.slice(searchPath.length + 1)
-        core.debug(`Resolved path: ${path}`)
-        resolvePathCache[fileName] = path
-        return path
-      }
+    const found = excludeSources.find(v => result.includes(v))
+    if (!found) {
+      const path = result.slice(searchPath.length + 1)
+      core.debug(`Resolved path: ${path}`)
+      resolvePathCache[fileName] = path
+      return path
     }
   }
+  // }
+
   resolvePathCache[fileName] = normalizedFilename
   return normalizedFilename
 }
@@ -164,6 +167,7 @@ export async function parseFile(
   excludeSources: string[] = ['/build/', '/__pycache__/'],
   checkTitleTemplate: string | undefined = undefined,
   breadCrumbDelimiter = '/',
+  stripFilePrefix = '',
   testFilesPrefix = '',
   transformer: Transformer[] = [],
   followSymlink = false,
@@ -208,6 +212,7 @@ export async function parseFile(
     suiteRegex, // no-op
     '',
     breadCrumbDelimiter,
+    stripFilePrefix,
     annotatePassed,
     checkRetries,
     excludeSources,
@@ -231,6 +236,7 @@ async function parseSuite(
   suiteRegex: string, // no-op
   breadCrumb: string,
   breadCrumbDelimiter = '/',
+  stripFilePrefix: string,
   annotatePassed = false,
   checkRetries = false,
   excludeSources: string[],
@@ -275,6 +281,7 @@ async function parseSuite(
       testFilesPrefix,
       transformer,
       followSymlink,
+      stripFilePrefix,
       truncateStackTraces,
       limit
     )
@@ -313,6 +320,7 @@ async function parseSuite(
       suiteRegex,
       childBreadCrumb,
       breadCrumbDelimiter,
+      stripFilePrefix,
       annotatePassed,
       checkRetries,
       excludeSources,
@@ -363,6 +371,7 @@ async function parseTestCases(
   testFilesPrefix = '',
   transformer: Transformer[],
   followSymlink: boolean,
+  stripFilePrefix: string,
   truncateStackTraces: boolean,
   limit = -1
 ): Promise<TestCasesResult> {
@@ -470,10 +479,8 @@ async function parseTestCases(
 
     core.debug(`Path prior to stripping: ${resolvedPath}`)
 
-    const githubWorkspacePath = process.env['GITHUB_WORKSPACE']
-    if (githubWorkspacePath) {
-      resolvedPath = resolvedPath.replace(`${githubWorkspacePath}/`, '') // strip workspace prefix, make the path relative
-    }
+    const prefix = stripFilePrefix.length > 0 ? stripFilePrefix : `${process.env['GITHUB_WORKSPACE']}/`
+    resolvedPath = resolvedPath.replace(prefix, '') // strip prefix, make the path relative
 
     let title = ''
     if (checkTitleTemplate) {
@@ -483,6 +490,7 @@ async function parseTestCases(
       const className = baseClassName.split('.').slice(-1)[0]
       title = checkTitleTemplate
         .replace(templateVar('FILE_NAME'), fileName)
+        .replace(templateVar('RESOLVED_PATH'), resolvedPath)
         .replace(templateVar('BREAD_CRUMB'), breadCrumb ?? '')
         .replace(templateVar('SUITE_NAME'), suiteName ?? '')
         .replace(templateVar('TEST_NAME'), testcase._attributes.name)
@@ -542,6 +550,7 @@ export async function parseTestReports(
   excludeSources: string[],
   checkTitleTemplate: string | undefined = undefined,
   breadCrumbDelimiter: string,
+  stripFilePrefix: string,
   testFilesPrefix = '',
   transformer: Transformer[] = [],
   followSymlink = false,
@@ -570,6 +579,7 @@ export async function parseTestReports(
       excludeSources,
       checkTitleTemplate,
       breadCrumbDelimiter,
+      stripFilePrefix,
       testFilesPrefix,
       transformer,
       followSymlink,
